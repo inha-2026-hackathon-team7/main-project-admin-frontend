@@ -1,49 +1,123 @@
+import { useEffect, useRef, useState } from 'react';
 import { useAdmin } from '../state/AdminContext.jsx';
 import Corners from './Corners.jsx';
+import { loadKakaoMaps } from '../lib/kakaoMaps.js';
 
-const SPAN_LAT = 0.05;
-const SPAN_LNG = 0.062;
+const DEFAULT_CENTER = { lat: 37.5665, lng: 126.978 }; // 서울시청 — 참고할 Place 가 없을 때 기본 중심
 
-/**
- * 좌표 픽커 — 실제 서비스에서는 react-kakao-maps-sdk 의 <Map onClick> 으로 교체하세요.
- * onClick 이 반환하는 latlng 를 그대로 form.latitude / form.longitude 에 넣으면 됩니다.
- */
 export default function MapPicker() {
   const { state, patch } = useAdmin();
   const f = state.form || {};
 
+  const mapElRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const refMarkersRef = useRef([]);
+  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [error, setError] = useState('');
+
   const pickRegionId = parseInt(f.region_id, 10);
   const ref = state.places.filter((p) => p.region_id === pickRegionId && p.id !== f.id);
-  const base = ref.length
-    ? {
-        lat: ref.reduce((a, p) => a + p.latitude, 0) / ref.length,
-        lng: ref.reduce((a, p) => a + p.longitude, 0) / ref.length
-      }
-    : { lat: 37.5665, lng: 126.978 };
+  const refKey = ref.map((p) => p.id).join(',');
 
   const pickedLat = parseFloat(f.latitude);
   const pickedLng = parseFloat(f.longitude);
   const hasPick = !Number.isNaN(pickedLat) && !Number.isNaN(pickedLng);
-  const center = hasPick ? { lat: pickedLat, lng: pickedLng } : base;
 
-  const toXY = (lat, lng) => ({
-    x: ((lng - (center.lng - SPAN_LNG / 2)) / SPAN_LNG) * 100,
-    y: (1 - (lat - (center.lat - SPAN_LAT / 2)) / SPAN_LAT) * 100
-  });
+  const regionCenter = () =>
+    ref.length
+      ? {
+          lat: ref.reduce((a, p) => a + p.latitude, 0) / ref.length,
+          lng: ref.reduce((a, p) => a + p.longitude, 0) / ref.length
+        }
+      : DEFAULT_CENTER;
 
-  const onPick = (ev) => {
-    const r = ev.currentTarget.getBoundingClientRect();
-    const fx = (ev.clientX - r.left) / r.width;
-    const fy = (ev.clientY - r.top) / r.height;
-    const lat = center.lat + (0.5 - fy) * SPAN_LAT;
-    const lng = center.lng + (fx - 0.5) * SPAN_LNG;
-    patch((s) => ({
-      form: { ...s.form, latitude: lat.toFixed(6), longitude: lng.toFixed(6), error: '' }
-    }));
-  };
+  /** 지도 인스턴스 생성 — 마운트 시 1회 */
+  useEffect(() => {
+    let cancelled = false;
+    loadKakaoMaps()
+      .then((kakao) => {
+        if (cancelled || !mapElRef.current) return;
+        const start = hasPick ? { lat: pickedLat, lng: pickedLng } : regionCenter();
+        const map = new kakao.maps.Map(mapElRef.current, {
+          center: new kakao.maps.LatLng(start.lat, start.lng),
+          level: 4
+        });
+        mapRef.current = map;
 
-  const onClear = () =>
-    patch((s) => ({ form: { ...s.form, latitude: '', longitude: '' } }));
+        kakao.maps.event.addListener(map, 'click', (mouseEvent) => {
+          const latlng = mouseEvent.latLng;
+          patch((s) => ({
+            form: {
+              ...s.form,
+              latitude: latlng.getLat().toFixed(6),
+              longitude: latlng.getLng().toFixed(6),
+              error: ''
+            }
+          }));
+        });
+
+        setStatus('ready');
+        // 모달 애니메이션 중 컨테이너 크기가 0이었을 수 있어 다음 틱에 재계산
+        setTimeout(() => map.relayout(), 0);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setStatus('error');
+          setError(e.message);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 마운트 시 1회만 — 이후 좌표/참조 갱신은 아래 별도 effect 가 담당
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** 선택 좌표 마커 표시/이동 */
+  useEffect(() => {
+    if (status !== 'ready' || !window.kakao || !mapRef.current) return;
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    if (hasPick) {
+      const pos = new kakao.maps.LatLng(pickedLat, pickedLng);
+      if (!markerRef.current) {
+        markerRef.current = new kakao.maps.Marker({ position: pos, map });
+      } else {
+        markerRef.current.setPosition(pos);
+        markerRef.current.setMap(map);
+      }
+      map.panTo(pos);
+    } else if (markerRef.current) {
+      markerRef.current.setMap(null);
+    }
+  }, [status, hasPick, pickedLat, pickedLng]);
+
+  /** 같은 지역의 다른 Place 를 참고 마커로 표시 */
+  useEffect(() => {
+    if (status !== 'ready' || !window.kakao || !mapRef.current) return;
+    const kakao = window.kakao;
+    const map = mapRef.current;
+    refMarkersRef.current.forEach((m) => m.setMap(null));
+    refMarkersRef.current = ref.map(
+      (p) =>
+        new kakao.maps.Marker({
+          position: new kakao.maps.LatLng(p.latitude, p.longitude),
+          map,
+          opacity: 0.55
+        })
+    );
+    if (!hasPick && ref.length) {
+      const c = regionCenter();
+      map.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+    }
+    return () => {
+      refMarkersRef.current.forEach((m) => m.setMap(null));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, refKey]);
+
+  const onClear = () => patch((s) => ({ form: { ...s.form, latitude: '', longitude: '' } }));
 
   return (
     <>
@@ -51,80 +125,29 @@ export default function MapPicker() {
         <label>위치 * — 지도를 클릭해 좌표를 지정하세요</label>
         <div
           className="blueprint"
-          onClick={onPick}
-          style={{
-            position: 'relative',
-            height: 216,
-            background: 'var(--color-neutral-100)',
-            cursor: 'crosshair',
-            backgroundImage:
-              'repeating-linear-gradient(to right,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%),repeating-linear-gradient(to bottom,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%)'
-          }}
+          style={{ position: 'relative', height: 216, background: 'var(--color-neutral-100)' }}
         >
           <Corners />
-          {ref.map((p) => {
-            const xy = toXY(p.latitude, p.longitude);
-            return (
-              <div
-                key={p.id}
-                title={p.name}
-                style={{
-                  position: 'absolute',
-                  left: `${xy.x.toFixed(2)}%`,
-                  top: `${xy.y.toFixed(2)}%`,
-                  width: 9,
-                  height: 9,
-                  margin: '-4.5px 0 0 -4.5px',
-                  border: '1.5px solid var(--color-accent-600)',
-                  pointerEvents: 'none'
-                }}
-              />
-            );
-          })}
-          {hasPick && (
+          {status !== 'ready' && (
             <div
               style={{
                 position: 'absolute',
-                left: '50%',
-                top: '50%',
-                width: 15,
-                height: 15,
-                margin: '-7.5px 0 0 -7.5px',
-                background: 'var(--color-accent)',
-                border: '1.5px solid var(--color-accent-800)',
-                boxShadow: '0 0 0 6px color-mix(in srgb,var(--color-accent) 22%,transparent)',
-                pointerEvents: 'none'
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                padding: 16,
+                textAlign: 'center',
+                fontSize: 12,
+                color: status === 'error' ? 'var(--color-accent-800)' : 'var(--color-neutral-600)'
               }}
-            />
+            >
+              {status === 'error' ? error : '지도를 불러오는 중…'}
+            </div>
           )}
           <div
-            style={{
-              position: 'absolute',
-              left: 8,
-              top: 8,
-              padding: '3px 7px',
-              background: 'var(--color-bg)',
-              border: '1px solid var(--color-divider)',
-              fontSize: 10,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--color-neutral-700)'
-            }}
-          >
-            react-kakao-maps-sdk · Map onClick
-          </div>
-          <div
-            style={{
-              position: 'absolute',
-              left: 8,
-              bottom: 8,
-              fontSize: 10,
-              fontFamily: 'ui-monospace,Menlo,monospace',
-              color: 'var(--color-neutral-700)'
-            }}
-          >
-            center {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
-          </div>
+            ref={mapElRef}
+            style={{ width: '100%', height: '100%', visibility: status === 'ready' ? 'visible' : 'hidden' }}
+          />
         </div>
       </div>
 

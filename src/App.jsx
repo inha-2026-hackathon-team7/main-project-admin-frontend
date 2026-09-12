@@ -18,29 +18,46 @@ import Register from './screens/Register.jsx';
 export default function App() {
   const { state, reloadAll } = useAdmin();
 
-  if (state.auth === 'login') return <Login />;
-  if (state.auth === 'register') return <Register />;
+  if (state.auth === 'login') {
+    return (
+      <>
+        <Login />
+        <Toasts />
+      </>
+    );
+  }
+  if (state.auth === 'register') {
+    return (
+      <>
+        <Register />
+        <Toasts />
+      </>
+    );
+  }
 
   if (state.bootError && state.regions.length === 0 && state.courses.length === 0) {
     return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          display: 'grid',
-          placeItems: 'center',
-          background: 'var(--color-bg)',
-          padding: 24
-        }}
-      >
-        <div className="card blueprint" style={{ maxWidth: 440, padding: 24, gap: 12, textAlign: 'center' }}>
-          <h3 style={{ margin: 0 }}>데이터를 불러오지 못했습니다</h3>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--color-neutral-700)' }}>{state.bootError}</p>
-          <button className="btn btn-primary" onClick={reloadAll}>
-            다시 시도
-          </button>
+      <>
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            background: 'var(--color-bg)',
+            padding: 24
+          }}
+        >
+          <div className="card blueprint" style={{ maxWidth: 440, padding: 24, gap: 12, textAlign: 'center' }}>
+            <h3 style={{ margin: 0 }}>데이터를 불러오지 못했습니다</h3>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--color-neutral-700)' }}>{state.bootError}</p>
+            <button className="btn btn-primary" onClick={reloadAll}>
+              다시 시도
+            </button>
+          </div>
         </div>
-      </div>
+        <Toasts />
+      </>
     );
   }
 

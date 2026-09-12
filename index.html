@@ -1,12 +1,22 @@
 <!doctype html>
 <html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>지역 코스 어드민</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>지역 코스 어드민</title>
+  <!--
+    카카오맵 SDK 는 로드 시 document.write 로 내부 스크립트를 추가로 삽입합니다.
+    페이지가 이미 로드된 뒤(React 마운트 후) JS 로 동적 주입하면 document.write 가
+    무시/차단되어 ERR_BLOCKED_BY_ORB 로 실패하므로, 반드시 초기 HTML 파싱 중에
+    이 <script> 가 실행되도록 head 에 정적으로 둡니다 (async/defer 금지).
+  -->
+  <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=%VITE_KAKAO_API_KEY%&autoload=false"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>

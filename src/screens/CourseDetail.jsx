@@ -12,6 +12,7 @@ export default function CourseDetail() {
     place,
     getCourseFull,
     ensureCourseFull,
+    closeCourseDetail,
     deleteCourse,
     updateCourse,
     moveDraft,
@@ -38,11 +39,7 @@ export default function CourseDetail() {
   if (!cur._detailLoaded) {
     return (
       <div style={{ animation: 'omFade .22s ease-out' }}>
-        <button
-          className="btn btn-ghost"
-          onClick={() => patch({ openCourseId: null, draftPlaces: null, dirty: false })}
-          style={{ marginBottom: 12 }}
-        >
+        <button className="btn btn-ghost" onClick={closeCourseDetail} style={{ marginBottom: 12 }}>
           ← 코스 목록
         </button>
         <div style={{ padding: '54px 20px', textAlign: 'center', border: '1px dashed var(--color-divider)' }}>
@@ -66,11 +63,7 @@ export default function CourseDetail() {
 
   return (
     <div style={{ animation: 'omFade .22s ease-out' }}>
-      <button
-        className="btn btn-ghost"
-        onClick={() => patch({ openCourseId: null, draftPlaces: null, dirty: false })}
-        style={{ marginBottom: 12 }}
-      >
+      <button className="btn btn-ghost" onClick={closeCourseDetail} style={{ marginBottom: 12 }}>
         ← 코스 목록
       </button>
 

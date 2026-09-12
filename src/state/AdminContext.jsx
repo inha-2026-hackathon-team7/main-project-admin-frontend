@@ -1,6 +1,9 @@
-import { createContext, useContext, useCallback, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { num } from '../lib/format.js';
-import { setToken } from '../lib/apiClient.js';
+import { setToken, setUnauthorizedHandler } from '../lib/apiClient.js';
+import { loadPersistedSession, savePersistedSession, clearPersistedSession } from '../lib/session.js';
+import { parseAppPath, pathForScreen } from '../lib/routes.js';
 import { authApi, regionsApi, placesApi, coursesApi, rewardsApi } from '../api/endpoints.js';
 import {
   regionFromApi,
@@ -27,9 +30,12 @@ const AdminContext = createContext(null);
 export const useAdmin = () => useContext(AdminContext);
 
 function createInitialState() {
+  const persisted = loadPersistedSession();
+  if (persisted) setToken(persisted.token);
+
   return {
-    screen: 'dashboard',
-    auth: 'login', // 'app' | 'login' | 'register'
+    // screen / openCourseId 는 URL 에서 파생되므로 여기 저장하지 않음 (AdminProvider 참고)
+    auth: persisted ? 'app' : 'login', // 'app' | 'login' | 'register'
     menuOpen: false,
     toasts: [],
 
@@ -50,7 +56,6 @@ function createInitialState() {
 
     courseType: 'all',
     courseStatus: 'all',
-    openCourseId: null,
     draftPlaces: null,
     poolSearch: '',
     dirty: false,
@@ -74,14 +79,24 @@ function createInitialState() {
       loading: false
     },
 
-    session: null // { org_name, admin_name, admin_email, role, initials }
+    session: persisted ? persisted.session : null // { org_name, admin_name, admin_email, role, initials }
   };
 }
 
 export function AdminProvider({ children }) {
-  const [state, setState] = useState(createInitialState);
+  const [rawState, setState] = useState(createInitialState);
+  const navigate = useNavigate();
+  const location = useLocation();
   const dragFrom = useRef(null);
   const toastSeq = useRef(1000);
+
+  // screen / openCourseId 는 URL 에서 파생 — 화면 컴포넌트는 그대로 state.screen / state.openCourseId 를 읽습니다.
+  const parsedPath = rawState.auth === 'app' ? parseAppPath(location.pathname) : null;
+  const state = {
+    ...rawState,
+    screen: parsedPath ? parsedPath.screen : 'dashboard',
+    openCourseId: parsedPath ? parsedPath.openCourseId : null
+  };
 
   /** setState(partial) 또는 setState(prev => partial) — 클래스형 setState 와 같은 병합 동작 */
   const patch = useCallback((next) => {
@@ -139,6 +154,33 @@ export function AdminProvider({ children }) {
       setState((s) => ({ ...s, bootLoading: false, bootError: e.message || '데이터를 불러오지 못했습니다' }));
     }
   }, []);
+
+  /** 마운트 시 1회: 401 응답 감지 시 세션을 정리하는 핸들러 등록 + 복원된 세션이 있으면 목록 로드 */
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setToken(null);
+      clearPersistedSession();
+      setState(createInitialState());
+      toast('warn', '세션이 만료되었습니다', '다시 로그인해주세요.');
+    });
+    if (rawState.auth === 'app') loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** 인증 상태 ↔ URL 경로 가드 — 미인증 접근/잘못된 경로/이미 로그인된 상태의 /login 접근을 정리 */
+  useEffect(() => {
+    if (rawState.auth === 'login') {
+      if (location.pathname !== '/login') navigate('/login', { replace: true });
+      return;
+    }
+    if (rawState.auth === 'register') {
+      if (location.pathname !== '/register') navigate('/register', { replace: true });
+      return;
+    }
+    if (!parseAppPath(location.pathname)) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [rawState.auth, location.pathname, navigate]);
 
   const api = useMemo(() => {
     const region = (id) => state.regions.find((r) => r.id === id);
@@ -219,8 +261,10 @@ export function AdminProvider({ children }) {
         .catch(() => {});
     };
 
-    const go = (screen) =>
-      patch({ screen, openCourseId: null, draftPlaces: null, dirty: false, modal: null });
+    const go = (screen) => {
+      navigate(pathForScreen(screen, null));
+      patch({ draftPlaces: null, dirty: false, modal: null });
+    };
     const closeModal = () => patch({ modal: null, form: {} });
     const setField = (key, ev) => {
       const t = ev.target;
@@ -398,15 +442,14 @@ export function AdminProvider({ children }) {
       });
 
     const openCourse = (c) => {
-      patch({
-        screen: 'courses',
-        openCourseId: c.id,
-        draftPlaces: null,
-        dirty: false,
-        poolSearch: '',
-        modal: null
-      });
+      navigate(pathForScreen('courses', c.id));
+      patch({ draftPlaces: null, dirty: false, poolSearch: '', modal: null });
       ensureCourseFull(c.id);
+    };
+
+    const closeCourseDetail = () => {
+      navigate('/courses');
+      patch({ draftPlaces: null, dirty: false });
     };
 
     const deleteCourse = async (c) => {
@@ -510,11 +553,13 @@ export function AdminProvider({ children }) {
     const runAction = async (a) => {
       if (!a) return;
       if (a.type === 'goPlaces') {
-        patch({ screen: 'places', regionFilter: String(a.regionId), modal: null });
+        navigate('/places');
+        patch({ regionFilter: String(a.regionId), modal: null });
         return;
       }
       if (a.type === 'goCourses') {
-        patch({ screen: 'courses', openCourseId: null, modal: null });
+        navigate('/courses');
+        patch({ modal: null });
         return;
       }
       if (a.type === 'confirmRegion') {
@@ -557,10 +602,10 @@ export function AdminProvider({ children }) {
       if (a.type === 'confirmCourse') {
         try {
           await coursesApi.remove(a.id);
+          navigate('/courses');
           patch((s) => ({
             courses: s.courses.filter((c) => c.id !== a.id),
-            modal: null,
-            openCourseId: null
+            modal: null
           }));
           toast('ok', '코스를 삭제했습니다', `DELETE /admin/courses/${a.id} → 204 · ${a.name}`);
         } catch (e) {
@@ -693,13 +738,12 @@ export function AdminProvider({ children }) {
             reward_name: detail.reward_name,
             participants: 0
           };
+          navigate(pathForScreen('courses', detail.id));
           patch((s) => ({
             courses: [...s.courses, listItem],
             courseDetails: { ...s.courseDetails, [detail.id]: detail },
             modal: null,
             form: {},
-            screen: 'courses',
-            openCourseId: detail.id,
             draftPlaces: detail.places.slice(),
             dirty: false
           }));
@@ -715,7 +759,7 @@ export function AdminProvider({ children }) {
         if (!q) return;
         const bonus = f.bonus_reward_id ? parseInt(f.bonus_reward_id, 10) : undefined;
         try {
-          await coursesApi.approve(f.id, bonus !== undefined ? { bonusRewardId: bonus } : {});
+          await coursesApi.approve(f.id, bonus !== undefined ? { bonus_reward_id: bonus } : {});
           const list = await coursesApi.list();
           patch((s) => ({
             pending: s.pending.filter((p) => p.id !== f.id),
@@ -726,7 +770,7 @@ export function AdminProvider({ children }) {
           toast(
             'ok',
             '코스를 승인했습니다',
-            `POST /admin/courses/${f.id}/approve${bonus ? ` {bonusRewardId:${bonus}}` : ''} · ${q.name}`
+            `POST /admin/courses/${f.id}/approve${bonus ? ` {bonus_reward_id:${bonus}}` : ''} · ${q.name}`
           );
         } catch (e) {
           failForm(e.message);
@@ -768,17 +812,25 @@ export function AdminProvider({ children }) {
           }));
           return;
         }
-        setToken(res.accessToken);
+        if (!res.access_token) {
+          patch((s) => ({
+            loginForm: { ...s.loginForm, loading: false, error: '서버 응답에 access_token 이 없습니다.' }
+          }));
+          return;
+        }
+        const session = {
+          org_name: lf.email.split('@')[1] || '조직',
+          admin_name: res.user.name,
+          admin_email: lf.email,
+          role: res.user.role,
+          initials: initialsOf(res.user.name)
+        };
+        setToken(res.access_token);
+        savePersistedSession(res.access_token, session);
+        navigate('/dashboard');
         patch({
           auth: 'app',
-          screen: 'dashboard',
-          session: {
-            org_name: lf.email.split('@')[1] || '조직',
-            admin_name: res.user.name,
-            admin_email: lf.email,
-            role: res.user.role,
-            initials: initialsOf(res.user.name)
-          },
+          session,
           loginForm: { email: '', password: '', error: '', loading: false }
         });
         toast('ok', '로그인했습니다', 'POST /auth/login → role=organization · 관리자 라우트 진입');
@@ -805,17 +857,23 @@ export function AdminProvider({ children }) {
       patch((s) => ({ regForm: { ...s.regForm, loading: true, error: '' } }));
       try {
         const res = await authApi.register(registerToApi(g));
-        setToken(res.accessToken);
+        if (!res.access_token) {
+          patch((s) => ({ regForm: { ...s.regForm, loading: false, error: '서버 응답에 access_token 이 없습니다.' } }));
+          return;
+        }
+        const session = {
+          org_name: g.organization_name.trim(),
+          admin_name: g.admin_name.trim(),
+          admin_email: g.admin_email.trim(),
+          role: 'organization',
+          initials: initialsOf(g.admin_name)
+        };
+        setToken(res.access_token);
+        savePersistedSession(res.access_token, session);
+        navigate('/dashboard');
         patch({
           auth: 'app',
-          screen: 'dashboard',
-          session: {
-            org_name: g.organization_name.trim(),
-            admin_name: g.admin_name.trim(),
-            admin_email: g.admin_email.trim(),
-            role: 'organization',
-            initials: initialsOf(g.admin_name)
-          },
+          session,
           regForm: {
             organization_name: '',
             organization_type: 'government',
@@ -839,7 +897,9 @@ export function AdminProvider({ children }) {
 
     const logout = () => {
       setToken(null);
+      clearPersistedSession();
       setState(createInitialState());
+      navigate('/login');
     };
 
     return {
@@ -863,6 +923,7 @@ export function AdminProvider({ children }) {
       deleteReward,
       openCourseForm,
       openCourse,
+      closeCourseDetail,
       deleteCourse,
       moveDraft,
       addDraft,
@@ -876,7 +937,7 @@ export function AdminProvider({ children }) {
       logout,
       reloadAll: loadAll
     };
-  }, [state, patch, toast, loadAll]);
+  }, [state, patch, toast, loadAll, navigate]);
 
   const value = useMemo(
     () => ({ state, patch, toast, dragFrom, session: state.session, ...api }),

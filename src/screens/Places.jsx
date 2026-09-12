@@ -3,20 +3,8 @@ import { useAdmin } from '../state/AdminContext.jsx';
 import Corners from '../components/Corners.jsx';
 import { PageHead } from '../components/Notice.jsx';
 import { PlusIcon, Svg, paths } from '../components/Icon.jsx';
+import PlacesMap from '../components/PlacesMap.jsx';
 import { coordsOf, blockedBtn } from '../lib/format.js';
-
-/** 필터된 좌표 집합을 와이어프레임 지도에 매핑하기 위한 범위 계산 */
-function span(arr, pad) {
-  if (!arr.length) return [0, 1];
-  let lo = Math.min(...arr);
-  let hi = Math.max(...arr);
-  if (hi - lo < 0.004) {
-    lo -= 0.02;
-    hi += 0.02;
-  }
-  const m = (hi - lo) * pad;
-  return [lo - m, hi + m];
-}
 
 export default function Places() {
   const { state, patch, region, place, coursesUsingPlace, ensurePlaceUsage, openPlaceForm, deletePlace } =
@@ -28,9 +16,6 @@ export default function Places() {
       (state.regionFilter === 'all' || String(p.region_id) === state.regionFilter) &&
       (!q || p.name.toLowerCase().includes(q))
   );
-
-  const [la0, la1] = span(filtered.map((p) => p.latitude), 0.18);
-  const [ln0, ln1] = span(filtered.map((p) => p.longitude), 0.18);
 
   const sel = place(state.selectedPlaceId) || filtered[0] || state.places[0];
   const selUsage = sel ? coursesUsingPlace(sel.id) : [];
@@ -202,54 +187,12 @@ export default function Places() {
             <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>latitude / longitude</span>
           </div>
 
-          <div
-            style={{
-              position: 'relative',
-              aspectRatio: '1/1',
-              background: 'var(--color-neutral-100)',
-              border: '1px solid var(--color-divider)',
-              backgroundImage:
-                'repeating-linear-gradient(to right,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%),repeating-linear-gradient(to bottom,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%)'
-            }}
-          >
-            {filtered.map((p) => {
-              const on = state.selectedPlaceId === p.id;
-              const x = ((p.longitude - ln0) / (ln1 - ln0)) * 100;
-              const y = (1 - (p.latitude - la0) / (la1 - la0)) * 100;
-              const d = on ? 13 : 9;
-              return (
-                <div
-                  key={p.id}
-                  title={p.name}
-                  onClick={() => patch({ selectedPlaceId: p.id })}
-                  style={{
-                    position: 'absolute',
-                    cursor: 'pointer',
-                    left: `${x.toFixed(2)}%`,
-                    top: `${y.toFixed(2)}%`,
-                    width: d,
-                    height: d,
-                    margin: `${-d / 2}px 0 0 ${-d / 2}px`,
-                    background: on ? 'var(--color-accent)' : 'transparent',
-                    border: `1.5px solid var(--color-accent${on ? '' : '-600'})`,
-                    boxShadow: on ? '0 0 0 5px color-mix(in srgb,var(--color-accent) 22%,transparent)' : 'none'
-                  }}
-                />
-              );
-            })}
-            <div
-              style={{
-                position: 'absolute',
-                left: 8,
-                bottom: 8,
-                fontSize: 10,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: 'var(--color-neutral-600)'
-              }}
-            >
-              wireframe map
-            </div>
+          <div style={{ border: '1px solid var(--color-divider)' }}>
+            <PlacesMap
+              places={filtered}
+              selectedId={sel ? sel.id : null}
+              onSelect={(id) => patch({ selectedPlaceId: id })}
+            />
           </div>
 
           <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 10 }}>
