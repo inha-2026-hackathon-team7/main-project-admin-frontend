@@ -1,0 +1,286 @@
+import { useEffect } from 'react';
+import { useAdmin } from '../state/AdminContext.jsx';
+import Corners from '../components/Corners.jsx';
+import { PageHead } from '../components/Notice.jsx';
+import { PlusIcon, Svg, paths } from '../components/Icon.jsx';
+import { coordsOf, blockedBtn } from '../lib/format.js';
+
+/** 필터된 좌표 집합을 와이어프레임 지도에 매핑하기 위한 범위 계산 */
+function span(arr, pad) {
+  if (!arr.length) return [0, 1];
+  let lo = Math.min(...arr);
+  let hi = Math.max(...arr);
+  if (hi - lo < 0.004) {
+    lo -= 0.02;
+    hi += 0.02;
+  }
+  const m = (hi - lo) * pad;
+  return [lo - m, hi + m];
+}
+
+export default function Places() {
+  const { state, patch, region, place, coursesUsingPlace, ensurePlaceUsage, openPlaceForm, deletePlace } =
+    useAdmin();
+
+  const q = state.placeSearch.trim().toLowerCase();
+  const filtered = state.places.filter(
+    (p) =>
+      (state.regionFilter === 'all' || String(p.region_id) === state.regionFilter) &&
+      (!q || p.name.toLowerCase().includes(q))
+  );
+
+  const [la0, la1] = span(filtered.map((p) => p.latitude), 0.18);
+  const [ln0, ln1] = span(filtered.map((p) => p.longitude), 0.18);
+
+  const sel = place(state.selectedPlaceId) || filtered[0] || state.places[0];
+  const selUsage = sel ? coursesUsingPlace(sel.id) : [];
+  const selUsageLoaded = sel ? place(sel.id).referencing_courses !== undefined : false;
+
+  useEffect(() => {
+    if (sel) ensurePlaceUsage(sel.id);
+  }, [sel && sel.id]);
+
+  return (
+    <div style={{ animation: 'omFade .22s ease-out' }}>
+      <PageHead
+        kicker="P0 · PLACES"
+        title="Place 관리"
+        desc="GET /admin/places?region_id= · qrcode_string 은 생성 시 서버가 발급합니다"
+        marginBottom={18}
+      >
+        <button className="btn btn-primary" onClick={() => openPlaceForm(null)} style={{ flex: 'none' }}>
+          <PlusIcon />
+          Place 생성
+        </button>
+      </PageHead>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 300 }}>
+          <input
+            className="input"
+            placeholder="Place 이름 검색"
+            value={state.placeSearch}
+            onChange={(e) => patch({ placeSearch: e.target.value })}
+            style={{ paddingLeft: 32 }}
+          />
+          <Svg size={15} stroke="var(--color-neutral-600)" style={{ position: 'absolute', left: 10, top: 11 }}>
+            <circle cx="11" cy="11" r="7" />
+            <path d={paths.search} />
+          </Svg>
+        </div>
+        <select
+          className="input"
+          value={state.regionFilter}
+          onChange={(e) => patch({ regionFilter: e.target.value })}
+          style={{ width: 'auto', minWidth: 170 }}
+        >
+          <option value="all">전체 지역</option>
+          {state.regions.map((r) => (
+            <option key={r.id} value={String(r.id)}>
+              {r.name} ({r.type})
+            </option>
+          ))}
+        </select>
+        <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
+          {filtered.length} / {state.places.length}개
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(380px,1fr))', gap: 20, alignItems: 'start' }}>
+        <div className="card blueprint" style={{ padding: 0 }}>
+          <Corners />
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ minWidth: 720, whiteSpace: 'nowrap' }}>
+              <thead>
+                <tr>
+                  <th style={{ paddingLeft: 16 }}>Place</th>
+                  <th>지역</th>
+                  <th>category</th>
+                  <th>좌표</th>
+                  <th style={{ textAlign: 'right', paddingRight: 16 }}>작업</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => {
+                  const used = coursesUsingPlace(p.id).length;
+                  const on = state.selectedPlaceId === p.id;
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={() => patch({ selectedPlaceId: p.id })}
+                      style={{ cursor: 'pointer', background: on ? 'var(--color-accent-100)' : undefined }}
+                    >
+                      <td style={{ paddingLeft: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span
+                            style={{
+                              width: 7,
+                              height: 7,
+                              flex: 'none',
+                              background: on ? 'var(--color-accent)' : 'var(--color-neutral-400)'
+                            }}
+                          />
+                          <div>
+                            <div style={{ fontWeight: 500 }}>{p.name}</div>
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: 'var(--color-neutral-600)',
+                                fontFamily: 'ui-monospace,Menlo,monospace'
+                              }}
+                            >
+                              {p.qrcode_string}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 13 }}>{(region(p.region_id) || {}).name || '—'}</td>
+                      <td>
+                        <span className="tag tag-accent">{p.category}</span>
+                      </td>
+                      <td
+                        style={{
+                          fontSize: 12,
+                          fontFamily: 'ui-monospace,Menlo,monospace',
+                          color: 'var(--color-neutral-700)',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {coordsOf(p)}
+                      </td>
+                      <td style={{ paddingRight: 16 }}>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button
+                            className="btn btn-secondary btn-icon"
+                            title="QR 코드"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              patch({ modal: 'qr', qrId: p.id });
+                            }}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                              <rect x="3" y="3" width="7" height="7" />
+                              <rect x="14" y="3" width="7" height="7" />
+                              <rect x="3" y="14" width="7" height="7" />
+                              <path d="M14 14h3v3h-3zM20 20h1M17 20h.01M20 17h.01" />
+                            </svg>
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              openPlaceForm(p);
+                            }}
+                          >
+                            수정
+                          </button>
+                          <button
+                            className="btn btn-secondary"
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              deletePlace(p);
+                            }}
+                            title={used ? `코스 ${used}개가 참조 중 — 삭제 불가` : '삭제 가능'}
+                            style={blockedBtn(used > 0)}
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card blueprint" style={{ padding: 16, gap: 12 }}>
+          <Corners />
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+            <h4 style={{ margin: 0, whiteSpace: 'nowrap' }}>위치 미리보기</h4>
+            <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>latitude / longitude</span>
+          </div>
+
+          <div
+            style={{
+              position: 'relative',
+              aspectRatio: '1/1',
+              background: 'var(--color-neutral-100)',
+              border: '1px solid var(--color-divider)',
+              backgroundImage:
+                'repeating-linear-gradient(to right,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%),repeating-linear-gradient(to bottom,color-mix(in srgb,var(--color-text) 7%,transparent) 0 1px,transparent 1px 12.5%)'
+            }}
+          >
+            {filtered.map((p) => {
+              const on = state.selectedPlaceId === p.id;
+              const x = ((p.longitude - ln0) / (ln1 - ln0)) * 100;
+              const y = (1 - (p.latitude - la0) / (la1 - la0)) * 100;
+              const d = on ? 13 : 9;
+              return (
+                <div
+                  key={p.id}
+                  title={p.name}
+                  onClick={() => patch({ selectedPlaceId: p.id })}
+                  style={{
+                    position: 'absolute',
+                    cursor: 'pointer',
+                    left: `${x.toFixed(2)}%`,
+                    top: `${y.toFixed(2)}%`,
+                    width: d,
+                    height: d,
+                    margin: `${-d / 2}px 0 0 ${-d / 2}px`,
+                    background: on ? 'var(--color-accent)' : 'transparent',
+                    border: `1.5px solid var(--color-accent${on ? '' : '-600'})`,
+                    boxShadow: on ? '0 0 0 5px color-mix(in srgb,var(--color-accent) 22%,transparent)' : 'none'
+                  }}
+                />
+              );
+            })}
+            <div
+              style={{
+                position: 'absolute',
+                left: 8,
+                bottom: 8,
+                fontSize: 10,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--color-neutral-600)'
+              }}
+            >
+              wireframe map
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 10 }}>
+            <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, lineHeight: 1.2 }}>
+              {sel ? sel.name : '선택된 Place 없음'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-neutral-700)', marginTop: 2 }}>
+              {sel ? `${(region(sel.region_id) || {}).name || '—'} · ${sel.category}` : '—'}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                fontFamily: 'ui-monospace,Menlo,monospace',
+                color: 'var(--color-neutral-700)',
+                marginTop: 6
+              }}
+            >
+              {sel ? coordsOf(sel) : '—'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--color-neutral-700)', marginTop: 6 }}>
+              {!sel
+                ? '—'
+                : !selUsageLoaded
+                  ? '참조 코스 확인 중…'
+                  : selUsage.length
+                    ? `참조 코스 ${selUsage.length}개: ${selUsage.map((c) => c.name).join(', ')}`
+                    : '참조 중인 코스 없음 — 삭제 가능'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,19 @@
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { color: var(--color-accent-700); }
+
+@keyframes omToast { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes omFade  { from { opacity: 0; transform: translateY(6px); }  to { opacity: 1; transform: none; } }
+
+/* hover affordances that were inline `style-hover` in the prototype */
+.om-hoverable:hover { background: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.om-menu-item:hover { background: var(--color-accent-100); }
+.om-menu-logout:hover { background: var(--color-accent-900); color: var(--color-bg); }
+.om-nav-item:hover { background: var(--color-accent-100); }
+.om-course-chip:hover { border-color: var(--color-accent) !important; }
+.om-toast-close:hover { opacity: 1 !important; }
