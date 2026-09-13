@@ -98,6 +98,8 @@ export default function Review() {
               <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
                 {p.type === 'ai' && p.ai_confidence != null && p.ai_confidence < 85
                   ? '신뢰도 85 미만 — 동선과 영업시간을 확인하세요'
+                  : p.type === 'user'
+                  ? '이미 사용자에게 공개된 코스입니다. 승인하면 보너스 리워드가 연결됩니다.'
                   : '승인 시 status=published 로 전환됩니다'}
               </span>
             </div>
