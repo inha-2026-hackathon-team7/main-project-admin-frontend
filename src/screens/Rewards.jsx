@@ -12,7 +12,7 @@ export default function Rewards() {
       <PageHead
         kicker="P0 · REWARDS"
         title="리워드 관리"
-        desc="포인트 · 쿠폰/바우처 · 재고 보충은 PUT /admin/rewards/{id}"
+        desc="완주한 사용자에게 줄 포인트나 쿠폰을 관리해요."
       >
         <button className="btn btn-primary" onClick={() => openRewardForm(null, false)} style={{ flex: 'none' }}>
           <PlusIcon />
@@ -47,11 +47,11 @@ export default function Rewards() {
                 }}
               >
                 <div>
-                  <div style={statLabel}>stock</div>
+                  <div style={statLabel}>재고</div>
                   <div style={statValue}>{num(r.stock)}</div>
                 </div>
                 <div>
-                  <div style={statLabel}>valid_until</div>
+                  <div style={statLabel}>사용 기한</div>
                   <div style={statValue}>{r.valid_until || '무기한'}</div>
                 </div>
               </div>
@@ -70,7 +70,7 @@ export default function Rewards() {
                 <button
                   className="btn btn-secondary"
                   onClick={() => deleteReward(r)}
-                  title={used ? `코스 ${used}개가 연결 중 — 삭제 불가` : '삭제 가능'}
+                  title={used ? `코스 ${used}개에 연결되어 있어 삭제할 수 없습니다` : '삭제 가능'}
                   style={blockedBtn(used > 0)}
                 >
                   삭제

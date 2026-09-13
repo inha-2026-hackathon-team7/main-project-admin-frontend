@@ -12,7 +12,7 @@ export default function Regions() {
       <PageHead
         kicker="P0 · REGIONS"
         title="지역 관리"
-        desc="단일 레벨 · 조직 소유 지역만 조회됩니다 (GET /admin/regions)"
+        desc="우리 조직이 관리하는 지역 목록이에요."
       >
         <button className="btn btn-primary" onClick={() => openRegionForm(null)} style={{ flex: 'none' }}>
           <PlusIcon />
@@ -28,8 +28,8 @@ export default function Regions() {
               <tr>
                 <th style={{ paddingLeft: 16 }}>ID</th>
                 <th>지역명</th>
-                <th>type</th>
-                <th style={{ textAlign: 'right' }}>Place</th>
+                <th>유형</th>
+                <th style={{ textAlign: 'right' }}>장소</th>
                 <th style={{ textAlign: 'right' }}>연결 코스</th>
                 <th style={{ textAlign: 'right', paddingRight: 16 }}>작업</th>
               </tr>
@@ -65,7 +65,7 @@ export default function Regions() {
                         <button
                           className="btn btn-secondary"
                           onClick={() => deleteRegion(r)}
-                          title={pc ? `하위 Place ${pc}개가 있어 삭제할 수 없습니다` : '삭제 가능'}
+                          title={pc ? `이 지역에 속한 장소 ${pc}개가 있어 삭제할 수 없습니다` : '삭제 가능'}
                           style={blockedBtn(pc > 0)}
                         >
                           삭제
@@ -81,8 +81,8 @@ export default function Regions() {
       </div>
 
       <Hint>
-        DELETE /admin/regions/&#123;id&#125; 은 하위 place 가 남아 있으면 FK 제약으로 실패합니다. 목록의 Place 수가 0 이
-        아닌 행은 삭제를 시도하면 차단 안내가 표시됩니다.
+        속한 장소가 남아 있는 지역은 삭제할 수 없어요. 장소 수가 0이 아닌 행에서 삭제를 시도하면 안내
+        메시지가 표시돼요.
       </Hint>
     </div>
   );

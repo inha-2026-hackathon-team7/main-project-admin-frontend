@@ -147,14 +147,12 @@ export const coursePlacesToApi = (placeIds) =>
   placeIds.map((placeId, i) => ({ place_id: placeId, visit_order: i + 1 }));
 
 /* ── 검수 대기 ────────────────────────────── */
-export const pendingItemFromApi = (p, type) => ({
+export const pendingItemFromApi = (p) => ({
   id: p.id,
   name: p.name,
   creator: p.creator,
   created_at: p.created_at,
-  type,
-  place_count: p.place_count ?? 0,
-  ai_confidence: p.ai_confidence != null ? Math.round(p.ai_confidence) : null
+  place_count: p.place_count ?? 0
 });
 
 /* ── 인증 ─────────────────────────────────── */

@@ -1,6 +1,6 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { num } from '../lib/format.js';
+import { num, statusLabel } from '../lib/format.js';
 import { setToken, setUnauthorizedHandler } from '../lib/apiClient.js';
 import { loadPersistedSession, savePersistedSession, clearPersistedSession } from '../lib/session.js';
 import { parseAppPath, pathForScreen } from '../lib/routes.js';
@@ -60,7 +60,6 @@ function createInitialState() {
     poolSearch: '',
     dirty: false,
 
-    reviewTab: 'ai',
     dashCourseId: null,
 
     modal: null, // 'form' | 'alert' | 'qr'
@@ -112,12 +111,11 @@ export function AdminProvider({ children }) {
   const loadAll = useCallback(async () => {
     setState((s) => ({ ...s, bootLoading: true, bootError: null }));
     try {
-      const [regionsRes, placesRes, rewardsRes, coursesRes, pendingAi, pendingUser] = await Promise.all([
+      const [regionsRes, placesRes, rewardsRes, coursesRes, pendingRes] = await Promise.all([
         regionsApi.list(),
         placesApi.list(),
         rewardsApi.list(),
         coursesApi.list(),
-        coursesApi.pending('AI'),
         coursesApi.pending('USER')
       ]);
       const places = placesRes.map(placeFromApi);
@@ -142,10 +140,7 @@ export function AdminProvider({ children }) {
         places,
         rewards: rewardsRes.map(rewardFromApi),
         courses,
-        pending: [
-          ...pendingAi.map((p) => pendingItemFromApi(p, 'ai')),
-          ...pendingUser.map((p) => pendingItemFromApi(p, 'user'))
-        ],
+        pending: pendingRes.map(pendingItemFromApi),
         selectedPlaceId: s.selectedPlaceId ?? (places[0] ? places[0].id : null),
         dashCourseId: s.dashCourseId ?? (courses[0] ? courses[0].id : null),
         bootLoading: false
@@ -289,13 +284,12 @@ export function AdminProvider({ children }) {
           modal: 'alert',
           alert: {
             severity: 'block',
-            endpoint: `DELETE /admin/regions/${r.id} → 409 FOREIGN KEY`,
-            title: '하위 Place 가 있어 삭제할 수 없습니다',
-            message: `「${r.name}」에 등록된 Place ${kids.length}개가 이 지역을 참조하고 있습니다. Place 를 다른 지역으로 옮기거나 먼저 삭제한 뒤 다시 시도하세요.`,
-            itemsLabel: '이 지역을 참조하는 Place',
+            title: '등록된 장소가 있어 삭제할 수 없습니다',
+            message: `「${r.name}」에 등록된 장소 ${kids.length}개가 이 지역에 속해 있습니다. 장소를 다른 지역으로 옮기거나 먼저 삭제한 뒤 다시 시도하세요.`,
+            itemsLabel: '이 지역에 속한 장소',
             items: kids.map((p) => ({ name: p.name, note: p.category })),
-            hint: '지역 삭제는 참조가 완전히 정리된 뒤에만 성공합니다.',
-            actionLabel: 'Place 관리로 이동',
+            hint: '지역 삭제는 속한 장소가 모두 정리된 뒤에만 가능해요.',
+            actionLabel: '장소 관리로 이동',
             action: { type: 'goPlaces', regionId: r.id }
           }
         });
@@ -305,9 +299,8 @@ export function AdminProvider({ children }) {
         modal: 'alert',
         alert: {
           severity: 'confirm',
-          endpoint: `DELETE /admin/regions/${r.id}`,
           title: '지역을 삭제할까요?',
-          message: `「${r.name}」을 삭제합니다. 하위 Place 가 없어 즉시 삭제됩니다.`,
+          message: `「${r.name}」을 삭제합니다. 속한 장소가 없어 바로 삭제돼요.`,
           actionLabel: '삭제',
           action: { type: 'confirmRegion', id: r.id, name: r.name }
         }
@@ -351,7 +344,7 @@ export function AdminProvider({ children }) {
           places: s.places.map((x) => (x.id === p.id ? { ...x, referencing_courses: used } : x))
         }));
       } catch (e) {
-        toast('warn', 'Place 정보를 확인하지 못했습니다', e.message);
+        toast('warn', '장소 정보를 확인하지 못했습니다', e.message);
         return;
       }
       if (used.length) {
@@ -359,12 +352,11 @@ export function AdminProvider({ children }) {
           modal: 'alert',
           alert: {
             severity: 'block',
-            endpoint: `DELETE /admin/places/${p.id} → 409 course_places 참조`,
-            title: '코스에서 참조 중인 Place 는 삭제할 수 없습니다',
-            message: `「${p.name}」은 코스 ${used.length}개의 구성에 포함되어 있습니다. 해당 코스의 구성에서 먼저 제거한 뒤 삭제하세요.`,
-            itemsLabel: '이 Place 를 참조하는 코스',
-            items: used.map((c) => ({ name: c.name, note: `status=${c.status}` })),
-            hint: '코스 관리 → 구성 편집에서 Place 를 제거하고 「구성 전체 저장」을 누르면 참조가 해제됩니다.',
+            title: '코스에 포함된 장소는 삭제할 수 없습니다',
+            message: `「${p.name}」은 코스 ${used.length}개의 방문 장소로 포함되어 있습니다. 해당 코스의 구성에서 먼저 빼낸 뒤 삭제하세요.`,
+            itemsLabel: '이 장소를 포함한 코스',
+            items: used.map((c) => ({ name: c.name, note: statusLabel(c.status) })),
+            hint: '코스 관리 → 구성 편집에서 장소를 빼고 「구성 전체 저장」을 누르면 연결이 풀려요.',
             actionLabel: '코스 관리로 이동',
             action: { type: 'goCourses' }
           }
@@ -375,9 +367,8 @@ export function AdminProvider({ children }) {
         modal: 'alert',
         alert: {
           severity: 'confirm',
-          endpoint: `DELETE /admin/places/${p.id}`,
-          title: 'Place 를 삭제할까요?',
-          message: `「${p.name}」을 삭제합니다. 발급된 qrcode_string 도 함께 폐기되어 현장 QR 은 인식되지 않습니다.`,
+          title: '장소를 삭제할까요?',
+          message: `「${p.name}」을 삭제합니다. 발급된 QR 코드도 함께 폐기되어 현장 QR 은 더 이상 인식되지 않아요.`,
           actionLabel: '삭제',
           action: { type: 'confirmPlace', id: p.id, name: p.name }
         }
@@ -409,12 +400,11 @@ export function AdminProvider({ children }) {
           modal: 'alert',
           alert: {
             severity: 'block',
-            endpoint: `DELETE /admin/rewards/${r.id} → 409 코스 연결`,
             title: '코스에 연결된 리워드는 삭제할 수 없습니다',
-            message: `「${r.name}」은 코스 ${used.length}개에 reward_id 로 연결되어 있습니다. 코스의 리워드 연결을 해제한 뒤 삭제하세요.`,
+            message: `「${r.name}」은 코스 ${used.length}개에 완주 리워드로 연결되어 있습니다. 코스의 리워드 연결을 해제한 뒤 삭제하세요.`,
             itemsLabel: '이 리워드를 연결한 코스',
-            items: used.map((c) => ({ name: c.name, note: `reward_id=${r.id}` })),
-            hint: '코스 상세의 「연결 리워드」를 연결 없음으로 바꾸면 참조가 해제됩니다.',
+            items: used.map((c) => ({ name: c.name })),
+            hint: '코스 상세의 「연결 리워드」를 연결 없음으로 바꾸면 풀려요.',
             actionLabel: '코스 관리로 이동',
             action: { type: 'goCourses' }
           }
@@ -425,9 +415,8 @@ export function AdminProvider({ children }) {
         modal: 'alert',
         alert: {
           severity: 'confirm',
-          endpoint: `DELETE /admin/rewards/${r.id}`,
           title: '리워드를 삭제할까요?',
-          message: `「${r.name}」을 삭제합니다. 연결된 코스가 없어 즉시 삭제됩니다.`,
+          message: `「${r.name}」을 삭제합니다. 연결된 코스가 없어 바로 삭제돼요.`,
           actionLabel: '삭제',
           action: { type: 'confirmReward', id: r.id, name: r.name }
         }
@@ -464,17 +453,16 @@ export function AdminProvider({ children }) {
           modal: 'alert',
           alert: {
             severity: 'block',
-            endpoint: `DELETE /admin/courses/${c.id} → course_enrollments 존재`,
             title: '참가자가 있는 코스는 삭제 대신 보관합니다',
-            message: `「${c.name}」에는 참가 기록 ${num(c.participants)}건이 있습니다. 하드 삭제는 참가·완주 이력을 함께 잃게 되므로 status 를 archived 로 전환하세요.`,
+            message: `「${c.name}」에는 참가 기록 ${num(c.participants)}건이 있습니다. 완전히 삭제하면 참가·완주 이력이 함께 사라지므로, 대신 코스를 보관 처리해 주세요.`,
             itemsLabel: '영향 범위',
             items: [
               { name: '참가 기록', note: `${num(c.participants)}건` },
               { name: '완주 기록', note: `${num(stats.completed)}건` },
               { name: '리워드 수령', note: `${num(stats.reward_claimed)}건` }
             ],
-            hint: 'archived 로 전환하면 사용자단 노출은 중단되고 이력은 보존됩니다.',
-            actionLabel: 'archived 로 전환',
+            hint: '보관 처리하면 사용자에게는 더 이상 보이지 않지만, 이력은 그대로 남아요.',
+            actionLabel: '보관 처리',
             action: { type: 'archiveCourse', id: c.id, name: c.name }
           }
         });
@@ -484,9 +472,8 @@ export function AdminProvider({ children }) {
         modal: 'alert',
         alert: {
           severity: 'confirm',
-          endpoint: `DELETE /admin/courses/${c.id}`,
           title: '코스를 삭제할까요?',
-          message: `「${c.name}」을 삭제합니다. 참가 기록이 없어 하드 삭제가 가능합니다.`,
+          message: `「${c.name}」을 삭제합니다. 참가 기록이 없어 완전히 삭제할 수 있어요.`,
           actionLabel: '삭제',
           action: { type: 'confirmCourse', id: c.id, name: c.name }
         }
@@ -539,11 +526,7 @@ export function AdminProvider({ children }) {
           courses: s.courses.map((c) => (c.id === id ? { ...c, place_count: draft.length } : c)),
           dirty: false
         }));
-        toast(
-          'ok',
-          '코스 구성을 저장했습니다',
-          `PUT /admin/courses/${id}/places → course_places ${draft.length}건 전량 교체`
-        );
+        toast('ok', '코스 구성을 저장했습니다', `방문 장소 ${draft.length}곳으로 갈아치웠어요`);
       } catch (e) {
         toast('warn', '구성 저장에 실패했습니다', e.message);
       }
@@ -566,7 +549,7 @@ export function AdminProvider({ children }) {
         try {
           await regionsApi.remove(a.id);
           patch((s) => ({ regions: s.regions.filter((r) => r.id !== a.id), modal: null }));
-          toast('ok', '지역을 삭제했습니다', `DELETE /admin/regions/${a.id} → 204 · ${a.name}`);
+          toast('ok', '지역을 삭제했습니다', a.name);
         } catch (e) {
           toast('warn', '지역을 삭제하지 못했습니다', e.message);
         }
@@ -583,9 +566,9 @@ export function AdminProvider({ children }) {
               selectedPlaceId: s.selectedPlaceId === a.id ? (rest[0] ? rest[0].id : null) : s.selectedPlaceId
             };
           });
-          toast('ok', 'Place 를 삭제했습니다', `DELETE /admin/places/${a.id} → 204 · ${a.name}`);
+          toast('ok', '장소를 삭제했습니다', a.name);
         } catch (e) {
-          toast('warn', 'Place 를 삭제하지 못했습니다', e.message);
+          toast('warn', '장소를 삭제하지 못했습니다', e.message);
         }
         return;
       }
@@ -593,7 +576,7 @@ export function AdminProvider({ children }) {
         try {
           await rewardsApi.remove(a.id);
           patch((s) => ({ rewards: s.rewards.filter((r) => r.id !== a.id), modal: null }));
-          toast('ok', '리워드를 삭제했습니다', `DELETE /admin/rewards/${a.id} → 204 · ${a.name}`);
+          toast('ok', '리워드를 삭제했습니다', a.name);
         } catch (e) {
           toast('warn', '리워드를 삭제하지 못했습니다', e.message);
         }
@@ -607,7 +590,7 @@ export function AdminProvider({ children }) {
             courses: s.courses.filter((c) => c.id !== a.id),
             modal: null
           }));
-          toast('ok', '코스를 삭제했습니다', `DELETE /admin/courses/${a.id} → 204 · ${a.name}`);
+          toast('ok', '코스를 삭제했습니다', a.name);
         } catch (e) {
           toast('warn', '코스를 삭제하지 못했습니다', e.message);
         }
@@ -620,13 +603,9 @@ export function AdminProvider({ children }) {
             courses: s.courses.map((c) => (c.id === a.id ? { ...c, status: 'archived' } : c)),
             modal: null
           }));
-          toast(
-            'ok',
-            'archived 로 전환했습니다',
-            `PUT /admin/courses/${a.id} {status:"archived"} · ${a.name}`
-          );
+          toast('ok', '코스를 보관 처리했습니다', a.name);
         } catch (e) {
-          toast('warn', '전환하지 못했습니다', e.message);
+          toast('warn', '보관 처리하지 못했습니다', e.message);
         }
       }
     };
@@ -636,7 +615,7 @@ export function AdminProvider({ children }) {
       const f = state.form || {};
 
       if (f.kind === 'region') {
-        if (!f.name || !f.name.trim()) return failForm('name 은 필수입니다.');
+        if (!f.name || !f.name.trim()) return failForm('이름을 입력해 주세요.');
         try {
           if (f.id) {
             const res = regionFromApi(await regionsApi.update(f.id, regionToApi(f)));
@@ -645,11 +624,11 @@ export function AdminProvider({ children }) {
               modal: null,
               form: {}
             }));
-            toast('ok', '지역을 수정했습니다', `PUT /admin/regions/${f.id} · ${f.name}`);
+            toast('ok', '지역을 수정했습니다', f.name);
           } else {
             const res = regionFromApi(await regionsApi.create(regionToApi(f)));
             patch((s) => ({ regions: [...s.regions, res], modal: null, form: {} }));
-            toast('ok', '지역을 생성했습니다', `POST /admin/regions → 201 · ${f.name}`);
+            toast('ok', '지역을 생성했습니다', f.name);
           }
         } catch (e) {
           failForm(e.message);
@@ -658,13 +637,13 @@ export function AdminProvider({ children }) {
       }
 
       if (f.kind === 'place') {
-        if (!f.name || !f.name.trim()) return failForm('name 은 필수입니다.');
+        if (!f.name || !f.name.trim()) return failForm('이름을 입력해 주세요.');
         const lat = parseFloat(f.latitude);
         const lng = parseFloat(f.longitude);
         if (Number.isNaN(lat) || Number.isNaN(lng))
-          return failForm('latitude 와 longitude 는 숫자여야 합니다.');
+          return failForm('위도와 경도는 숫자로 입력해 주세요.');
         if (lat < -90 || lat > 90 || lng < -180 || lng > 180)
-          return failForm('좌표 범위를 벗어났습니다 (lat -90~90, lng -180~180).');
+          return failForm('좌표 범위를 벗어났습니다. 위도는 -90~90, 경도는 -180~180 사이여야 해요.');
         try {
           if (f.id) {
             const res = placeFromApi(await placesApi.update(f.id, placeUpdateToApi(f)));
@@ -673,7 +652,7 @@ export function AdminProvider({ children }) {
               modal: null,
               form: {}
             }));
-            toast('ok', 'Place 를 수정했습니다', `PUT /admin/places/${f.id} · ${f.name}`);
+            toast('ok', '장소를 수정했습니다', f.name);
           } else {
             const res = placeFromApi(await placesApi.create(placeCreateToApi(f)));
             patch((s) => ({
@@ -682,11 +661,7 @@ export function AdminProvider({ children }) {
               modal: null,
               form: {}
             }));
-            toast(
-              'ok',
-              'Place 를 생성했습니다',
-              `POST /admin/places → 201 · qrcode_string=${res.qrcode_string} 자동 발급`
-            );
+            toast('ok', '장소를 생성했습니다', 'QR 코드가 자동으로 발급됐어요.');
           }
         } catch (e) {
           failForm(e.message);
@@ -695,9 +670,9 @@ export function AdminProvider({ children }) {
       }
 
       if (f.kind === 'reward') {
-        if (!f.name || !f.name.trim()) return failForm('name 은 필수입니다.');
+        if (!f.name || !f.name.trim()) return failForm('이름을 입력해 주세요.');
         const stock = parseInt(f.stock, 10);
-        if (Number.isNaN(stock) || stock < 0) return failForm('stock 은 0 이상의 정수여야 합니다.');
+        if (Number.isNaN(stock) || stock < 0) return failForm('재고 수량은 0 이상의 정수로 입력해 주세요.');
         try {
           if (f.id) {
             const res = rewardFromApi(await rewardsApi.update(f.id, rewardUpdateToApi(f)));
@@ -709,12 +684,12 @@ export function AdminProvider({ children }) {
             toast(
               'ok',
               f.restock ? '재고를 보충했습니다' : '리워드를 수정했습니다',
-              `PUT /admin/rewards/${f.id} {stock:${stock}}`
+              `현재 재고 ${stock}개`
             );
           } else {
             const res = rewardFromApi(await rewardsApi.create(rewardCreateToApi(f)));
             patch((s) => ({ rewards: [...s.rewards, res], modal: null, form: {} }));
-            toast('ok', '리워드를 생성했습니다', `POST /admin/rewards → 201 · ${f.name}`);
+            toast('ok', '리워드를 생성했습니다', f.name);
           }
         } catch (e) {
           failForm(e.message);
@@ -723,7 +698,7 @@ export function AdminProvider({ children }) {
       }
 
       if (f.kind === 'course') {
-        if (!f.name || !f.name.trim()) return failForm('name 은 필수입니다.');
+        if (!f.name || !f.name.trim()) return failForm('이름을 입력해 주세요.');
         try {
           const detail = courseDetailFromApi(await coursesApi.create(courseCreateToApi(f)));
           const listItem = {
@@ -747,7 +722,7 @@ export function AdminProvider({ children }) {
             draftPlaces: detail.places.slice(),
             dirty: false
           }));
-          toast('ok', '코스를 생성했습니다', 'POST /admin/courses → 201 · type=official, status=draft');
+          toast('ok', '코스를 생성했습니다', '공식 코스로 등록됐고, 아직 준비중 상태예요.');
         } catch (e) {
           failForm(e.message);
         }
@@ -767,11 +742,7 @@ export function AdminProvider({ children }) {
             modal: null,
             form: {}
           }));
-          toast(
-            'ok',
-            '코스를 승인했습니다',
-            `POST /admin/courses/${f.id}/approve${bonus ? ` {bonus_reward_id:${bonus}}` : ''} · ${q.name}`
-          );
+          toast('ok', '코스를 승인했습니다', bonus ? `${q.name} · 보너스 리워드 연결됨` : q.name);
         } catch (e) {
           failForm(e.message);
         }
@@ -780,12 +751,12 @@ export function AdminProvider({ children }) {
 
       if (f.kind === 'reject') {
         if (!f.reason || !f.reason.trim())
-          return failForm('reason 을 입력해야 제출자에게 사유가 전달됩니다.');
+          return failForm('반려 사유를 입력해야 만든 사람에게 전달돼요.');
         const q = state.pending.find((p) => p.id === f.id);
         try {
           await coursesApi.reject(f.id, { reason: f.reason.trim() });
           patch((s) => ({ pending: s.pending.filter((p) => p.id !== f.id), modal: null, form: {} }));
-          toast('warn', '코스를 반려했습니다', `POST /admin/courses/${f.id}/reject · ${q ? q.name : ''}`);
+          toast('warn', '코스를 반려했습니다', q ? q.name : '');
         } catch (e) {
           failForm(e.message);
         }
@@ -808,13 +779,13 @@ export function AdminProvider({ children }) {
         const res = await authApi.login(loginToApi(lf));
         if (!res.user || res.user.role !== 'organization') {
           patch((s) => ({
-            loginForm: { ...s.loginForm, loading: false, error: '조직 관리자(role=organization) 계정만 로그인할 수 있습니다.' }
+            loginForm: { ...s.loginForm, loading: false, error: '조직 관리자 계정으로만 로그인할 수 있어요.' }
           }));
           return;
         }
         if (!res.access_token) {
           patch((s) => ({
-            loginForm: { ...s.loginForm, loading: false, error: '서버 응답에 access_token 이 없습니다.' }
+            loginForm: { ...s.loginForm, loading: false, error: '로그인 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.' }
           }));
           return;
         }
@@ -833,7 +804,7 @@ export function AdminProvider({ children }) {
           session,
           loginForm: { email: '', password: '', error: '', loading: false }
         });
-        toast('ok', '로그인했습니다', 'POST /auth/login → role=organization · 관리자 라우트 진입');
+        toast('ok', '로그인했습니다', '대시보드로 이동합니다.');
         loadAll();
       } catch (e) {
         patch((s) => ({ loginForm: { ...s.loginForm, loading: false, error: e.message } }));
@@ -850,7 +821,7 @@ export function AdminProvider({ children }) {
       }
       if (g.admin_password.length < 8) {
         patch((s) => ({
-          regForm: { ...s.regForm, error: 'admin_password 는 8자 이상이어야 합니다.' }
+          regForm: { ...s.regForm, error: '비밀번호는 8자 이상으로 입력해 주세요.' }
         }));
         return;
       }
@@ -858,7 +829,7 @@ export function AdminProvider({ children }) {
       try {
         const res = await authApi.register(registerToApi(g));
         if (!res.access_token) {
-          patch((s) => ({ regForm: { ...s.regForm, loading: false, error: '서버 응답에 access_token 이 없습니다.' } }));
+          patch((s) => ({ regForm: { ...s.regForm, loading: false, error: '가입 처리 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.' } }));
           return;
         }
         const session = {
@@ -887,7 +858,7 @@ export function AdminProvider({ children }) {
         toast(
           'ok',
           '조직을 생성하고 로그인했습니다',
-          'POST /admin/auth/register → organizations + users(role=organization) + organization_members(role=owner) 트랜잭션'
+          '조직과 관리자 계정이 만들어졌어요.'
         );
         loadAll();
       } catch (e) {

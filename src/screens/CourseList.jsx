@@ -2,7 +2,7 @@ import { useAdmin } from '../state/AdminContext.jsx';
 import Corners from '../components/Corners.jsx';
 import { PageHead, Hint } from '../components/Notice.jsx';
 import { PlusIcon } from '../components/Icon.jsx';
-import { num, typeTag, statusTag, blockedBtn } from '../lib/format.js';
+import { num, typeTag, typeLabel, statusTag, statusLabel, blockedBtn } from '../lib/format.js';
 
 export default function CourseList() {
   const { state, patch, openCourseForm, openCourse, deleteCourse } = useAdmin();
@@ -18,7 +18,7 @@ export default function CourseList() {
       <PageHead
         kicker="P0 · COURSES"
         title="코스 관리"
-        desc="관리자 생성 코스는 type=official · 구성 변경은 PUT /admin/courses/{id}/places 전량 교체"
+        desc="관리자가 직접 만든 코스는 공식 코스로 등록됩니다. 코스에 포함할 장소는 아래에서 언제든 바꿀 수 있어요."
         marginBottom={18}
       >
         <button className="btn btn-primary" onClick={openCourseForm} style={{ flex: 'none' }}>
@@ -34,10 +34,10 @@ export default function CourseList() {
           onChange={(e) => patch({ courseType: e.target.value })}
           style={{ width: 'auto', minWidth: 150 }}
         >
-          <option value="all">전체 type</option>
-          <option value="official">official</option>
-          <option value="user">user</option>
-          <option value="ai">ai</option>
+          <option value="all">전체 유형</option>
+          <option value="official">공식</option>
+          <option value="user">사용자 제작</option>
+          <option value="ai">AI 추천</option>
         </select>
         <select
           className="input"
@@ -45,10 +45,10 @@ export default function CourseList() {
           onChange={(e) => patch({ courseStatus: e.target.value })}
           style={{ width: 'auto', minWidth: 150 }}
         >
-          <option value="all">전체 status</option>
-          <option value="draft">draft</option>
-          <option value="published">published</option>
-          <option value="archived">archived</option>
+          <option value="all">전체 상태</option>
+          <option value="draft">준비중</option>
+          <option value="published">게시됨</option>
+          <option value="archived">보관됨</option>
         </select>
         <span style={{ fontSize: 12, color: 'var(--color-neutral-600)' }}>
           {filtered.length} / {state.courses.length}개
@@ -62,8 +62,8 @@ export default function CourseList() {
             <thead>
               <tr>
                 <th style={{ paddingLeft: 16 }}>코스</th>
-                <th>type</th>
-                <th>status</th>
+                <th>유형</th>
+                <th>상태</th>
                 <th>구성</th>
                 <th>리워드</th>
                 <th style={{ textAlign: 'right' }}>조회</th>
@@ -77,16 +77,16 @@ export default function CourseList() {
                   <td style={{ paddingLeft: 16 }}>
                     <div style={{ fontWeight: 500 }}>{c.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>
-                      {c.is_ordered ? 'is_ordered=true · 순서 강제' : 'is_ordered=false · 자유 방문'}
+                      {c.is_ordered ? '순서대로 방문' : '자유롭게 방문'}
                     </div>
                   </td>
                   <td>
-                    <span className={`tag ${typeTag(c.type)}`}>{c.type}</span>
+                    <span className={`tag ${typeTag(c.type)}`}>{typeLabel(c.type)}</span>
                   </td>
                   <td>
-                    <span className={`tag ${statusTag(c.status)}`}>{c.status}</span>
+                    <span className={`tag ${statusTag(c.status)}`}>{statusLabel(c.status)}</span>
                   </td>
-                  <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{c.place_count}개 Place</td>
+                  <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{c.place_count}개 장소</td>
                   <td style={{ fontSize: 13 }}>{c.reward_id ? c.reward_name || '삭제된 리워드' : '—'}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{num(c.view_count)}</td>
                   <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{num(c.participants)}</td>
@@ -100,7 +100,7 @@ export default function CourseList() {
                         onClick={() => deleteCourse(c)}
                         title={
                           c.participants > 0
-                            ? `참가자 ${num(c.participants)}명 — 삭제 대신 archived 로 전환하세요`
+                            ? `참가자 ${num(c.participants)}명 — 삭제 대신 보관 처리해 주세요`
                             : '삭제 가능'
                         }
                         style={blockedBtn(c.participants > 0)}
@@ -117,8 +117,8 @@ export default function CourseList() {
       </div>
 
       <Hint maxWidth={680}>
-        course_enrollments 가 있는 코스는 하드 삭제 대신 status=archived 로 전환합니다. 참가자가 있는 행의 삭제
-        버튼은 비활성이며, 상세 화면의 status 드롭다운으로 보관 처리하세요.
+        참가 기록이 있는 코스는 완전히 삭제하는 대신 보관 처리됩니다. 참가자가 있는 행의 삭제 버튼은
+        비활성이며, 상세 화면의 상태 드롭다운에서 보관 처리할 수 있어요.
       </Hint>
     </div>
   );

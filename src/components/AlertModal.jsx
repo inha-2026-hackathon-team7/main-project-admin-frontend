@@ -35,16 +35,6 @@ export default function AlertModal() {
             </Svg>
           </div>
           <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontSize: 10,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--color-accent-700)'
-              }}
-            >
-              {a.endpoint}
-            </div>
             <div className="dialog-title">{a.title}</div>
           </div>
         </div>

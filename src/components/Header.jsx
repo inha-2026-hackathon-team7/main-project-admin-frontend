@@ -42,7 +42,7 @@ export default function Header() {
           {org.org_name}
         </span>
         <span className="tag tag-outline" style={{ flex: 'none' }}>
-          organization
+          조직 관리자
         </span>
       </div>
 
@@ -68,7 +68,7 @@ export default function Header() {
         title="목록을 다시 불러옵니다"
         onClick={() => {
           reloadAll();
-          toast('info', '새로고침했습니다', 'GET /admin/regions · places · courses · rewards · courses/pending');
+          toast('info', '새로고침했습니다', '지역·장소·코스·리워드·검수 목록을 새로 불러왔어요.');
         }}
       >
         새로고침
@@ -138,7 +138,7 @@ export default function Header() {
           <div style={{ lineHeight: 1.2, whiteSpace: 'nowrap' }}>
             <div style={{ fontSize: 13, fontWeight: 500 }}>{org.admin_name}</div>
             <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>
-              {org.role} · {org.admin_email}
+              조직 관리자 · {org.admin_email}
             </div>
           </div>
           <Icon
@@ -169,7 +169,7 @@ export default function Header() {
                 {org.admin_email}
               </div>
               <div style={{ display: 'flex', gap: 5, marginTop: 7 }}>
-                <span className="tag tag-accent">{org.role}</span>
+                <span className="tag tag-accent">조직 관리자</span>
                 <span className="tag tag-neutral">{org.org_name}</span>
               </div>
             </div>

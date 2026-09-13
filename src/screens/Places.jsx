@@ -29,13 +29,13 @@ export default function Places() {
     <div style={{ animation: 'omFade .22s ease-out' }}>
       <PageHead
         kicker="P0 · PLACES"
-        title="Place 관리"
-        desc="GET /admin/places?region_id= · qrcode_string 은 생성 시 서버가 발급합니다"
+        title="장소 관리"
+        desc="지역에 속한 장소들이에요. QR 코드는 등록하면 자동으로 발급돼요."
         marginBottom={18}
       >
         <button className="btn btn-primary" onClick={() => openPlaceForm(null)} style={{ flex: 'none' }}>
           <PlusIcon />
-          Place 생성
+          장소 생성
         </button>
       </PageHead>
 
@@ -43,7 +43,7 @@ export default function Places() {
         <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 300 }}>
           <input
             className="input"
-            placeholder="Place 이름 검색"
+            placeholder="장소 이름 검색"
             value={state.placeSearch}
             onChange={(e) => patch({ placeSearch: e.target.value })}
             style={{ paddingLeft: 32 }}
@@ -78,9 +78,9 @@ export default function Places() {
             <table className="table" style={{ minWidth: 720, whiteSpace: 'nowrap' }}>
               <thead>
                 <tr>
-                  <th style={{ paddingLeft: 16 }}>Place</th>
+                  <th style={{ paddingLeft: 16 }}>장소</th>
                   <th>지역</th>
-                  <th>category</th>
+                  <th>분류</th>
                   <th>좌표</th>
                   <th style={{ textAlign: 'right', paddingRight: 16 }}>작업</th>
                 </tr>
@@ -165,7 +165,7 @@ export default function Places() {
                               ev.stopPropagation();
                               deletePlace(p);
                             }}
-                            title={used ? `코스 ${used}개가 참조 중 — 삭제 불가` : '삭제 가능'}
+                            title={used ? `코스 ${used}개에 포함되어 있어 삭제할 수 없습니다` : '삭제 가능'}
                             style={blockedBtn(used > 0)}
                           >
                             삭제
@@ -184,7 +184,7 @@ export default function Places() {
           <Corners />
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
             <h4 style={{ margin: 0, whiteSpace: 'nowrap' }}>위치 미리보기</h4>
-            <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>latitude / longitude</span>
+            <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>위도 · 경도</span>
           </div>
 
           <div style={{ border: '1px solid var(--color-divider)' }}>
@@ -197,7 +197,7 @@ export default function Places() {
 
           <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 10 }}>
             <div style={{ fontFamily: 'var(--font-heading)', fontSize: 17, lineHeight: 1.2 }}>
-              {sel ? sel.name : '선택된 Place 없음'}
+              {sel ? sel.name : '선택된 장소 없음'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--color-neutral-700)', marginTop: 2 }}>
               {sel ? `${(region(sel.region_id) || {}).name || '—'} · ${sel.category}` : '—'}
@@ -216,10 +216,10 @@ export default function Places() {
               {!sel
                 ? '—'
                 : !selUsageLoaded
-                  ? '참조 코스 확인 중…'
+                  ? '포함된 코스 확인 중…'
                   : selUsage.length
-                    ? `참조 코스 ${selUsage.length}개: ${selUsage.map((c) => c.name).join(', ')}`
-                    : '참조 중인 코스 없음 — 삭제 가능'}
+                    ? `이 장소를 포함한 코스 ${selUsage.length}개: ${selUsage.map((c) => c.name).join(', ')}`
+                    : '포함된 코스 없음 — 삭제 가능'}
             </div>
           </div>
         </div>

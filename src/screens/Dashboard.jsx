@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAdmin } from '../state/AdminContext.jsx';
 import Corners from '../components/Corners.jsx';
 import { Svg, WarnCircleIcon, paths } from '../components/Icon.jsx';
-import { num, pct, typeTag, statusTag } from '../lib/format.js';
+import { num, pct, typeTag, typeLabel, statusTag, statusLabel } from '../lib/format.js';
 
 export default function Dashboard() {
   const { state, patch, go, place, reward, getCourseFull, ensureCourseFull, openCourse, openRewardForm } =
@@ -37,27 +37,27 @@ export default function Dashboard() {
 
   const ratios = dc
     ? [
-        { label: '참가 전환율', value: `${pct(dc.participants, dc.view_count)}%`, note: 'participants / view_count' },
-        { label: '완주율', value: `${pct(dc.completed, dc.participants)}%`, note: 'completed / participants' },
-        { label: '리워드 수령률', value: `${pct(dc.reward_claimed, dc.completed)}%`, note: 'reward_claimed / completed' },
-        { label: '이탈률', value: `${pct(dc.abandoned, dc.participants)}%`, note: 'abandoned / participants' }
+        { label: '참가 전환율', value: `${pct(dc.participants, dc.view_count)}%`, note: '조회한 사람 중 참가한 비율' },
+        { label: '완주율', value: `${pct(dc.completed, dc.participants)}%`, note: '참가한 사람 중 완주한 비율' },
+        { label: '리워드 수령률', value: `${pct(dc.reward_claimed, dc.completed)}%`, note: '완주한 사람 중 리워드를 받은 비율' },
+        { label: '이탈률', value: `${pct(dc.abandoned, dc.participants)}%`, note: '참가했지만 완주하지 못한 비율' }
       ]
     : [];
 
   const kpis = dc
     ? [
-        { label: 'view_count', value: num(dc.view_count), note: '상세 진입 기준' },
-        { label: 'participants', value: num(dc.participants), note: 'course_enrollments' },
-        { label: 'completed', value: num(dc.completed), note: `완주율 ${pct(dc.completed, dc.participants)}%` },
-        { label: 'abandoned', value: num(dc.abandoned), note: `이탈률 ${pct(dc.abandoned, dc.participants)}%` },
-        { label: 'reward_claimed', value: num(dc.reward_claimed), note: `수령률 ${pct(dc.reward_claimed, dc.completed)}%` }
+        { label: '조회수', value: num(dc.view_count), note: '상세 진입 기준' },
+        { label: '참가자', value: num(dc.participants), note: '코스를 시작한 사람 수' },
+        { label: '완주자', value: num(dc.completed), note: `완주율 ${pct(dc.completed, dc.participants)}%` },
+        { label: '이탈자', value: num(dc.abandoned), note: `이탈률 ${pct(dc.abandoned, dc.participants)}%` },
+        { label: '리워드 수령', value: num(dc.reward_claimed), note: `수령률 ${pct(dc.reward_claimed, dc.completed)}%` }
       ]
     : [];
 
   /** 구간별 통과 추정 — 실제 체크인 로그 API 가 생기면 이 계산을 대체하세요. */
   const stops = dc && dc.places
     ? dc.places.map((pid, i) => {
-        const p = place(pid) || { name: '삭제된 Place' };
+        const p = place(pid) || { name: '삭제된 장소' };
         const base = dc.participants ? dc.completed / dc.participants || 0.5 : 0;
         const keep = dc.participants
           ? Math.round(dc.participants * Math.pow(base, (i + 1) / dc.places.length))
@@ -105,13 +105,13 @@ export default function Dashboard() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0 }}>{dc ? dc.name : '코스 없음'}</h2>
-            {dc && <span className={`tag ${typeTag(dc.type)}`}>{dc.type}</span>}
-            {dc && <span className={`tag ${statusTag(dc.status)}`}>{dc.status}</span>}
+            {dc && <span className={`tag ${typeTag(dc.type)}`}>{typeLabel(dc.type)}</span>}
+            {dc && <span className={`tag ${statusTag(dc.status)}`}>{statusLabel(dc.status)}</span>}
           </div>
           {dc && (
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-neutral-700)' }}>
-              GET /admin/courses/{dc.id}/stats · {dc.place_count}개 Place ·{' '}
-              {dc.is_ordered ? 'is_ordered=true' : 'is_ordered=false'} · {rew ? rew.name : '연결된 리워드 없음'}
+              {dc.place_count}개 장소 · {dc.is_ordered ? '순서대로 방문' : '자유롭게 방문'} ·{' '}
+              {rew ? rew.name : '연결된 리워드 없음'}
             </p>
           )}
         </div>
@@ -157,7 +157,7 @@ export default function Dashboard() {
                 }}
               >
                 <span className={`tag ${statusTag(c.status)}`} style={{ alignSelf: 'flex-start' }}>
-                  {c.status}
+                  {statusLabel(c.status)}
                 </span>
                 <div
                   style={{
@@ -201,7 +201,7 @@ export default function Dashboard() {
           <Corners />
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
             <h4 style={{ margin: 0 }}>전환 퍼널</h4>
-            <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>view_count 대비 비율</span>
+            <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>조회수 대비 비율</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -247,15 +247,7 @@ export default function Dashboard() {
                 <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 600, fontSize: 25, lineHeight: 1.15 }}>
                   {rt.value}
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--color-neutral-600)',
-                    fontFamily: 'ui-monospace,Menlo,monospace'
-                  }}
-                >
-                  {rt.note}
-                </div>
+                <div style={{ fontSize: 10, color: 'var(--color-neutral-600)' }}>{rt.note}</div>
               </div>
             ))}
           </div>
@@ -263,7 +255,7 @@ export default function Dashboard() {
           <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 13 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 9 }}>
               <h4 style={{ margin: 0 }}>구간별 통과 · 추정</h4>
-              <span className="tag tag-outline">체크인 로그 API 필요</span>
+              <span className="tag tag-outline">추정치</span>
             </div>
             <div
               style={{
@@ -355,8 +347,8 @@ export default function Dashboard() {
                 key={p.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: '1px solid var(--color-divider)' }}
               >
-                <span className={`tag ${p.type === 'ai' ? 'tag-accent-2' : 'tag-neutral'}`} style={{ flex: 'none' }}>
-                  {p.type === 'ai' ? 'AI' : 'USER'}
+                <span className="tag tag-neutral" style={{ flex: 'none' }}>
+                  사용자 제작
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -388,8 +380,8 @@ export default function Dashboard() {
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>
                     {r.stock === 0
-                      ? '재고 0 — 사용자단 지급이 중단됩니다'
-                      : `재고 ${r.stock}개 남음 · valid_until ${r.valid_until || '무기한'}`}
+                      ? '재고가 없어 완주자에게 지급할 수 없어요'
+                      : `재고 ${r.stock}개 남음 · 사용 기한 ${r.valid_until || '무기한'}`}
                   </div>
                 </div>
                 <button className="btn btn-secondary" onClick={() => openRewardForm(r, true)} style={{ flex: 'none' }}>
@@ -403,22 +395,12 @@ export default function Dashboard() {
             <Corners />
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
               <h4 style={{ margin: 0 }}>추가 지표 제안</h4>
-              <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>현재 스펙에 없는 값</span>
+              <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>아직 제공되지 않는 지표예요</span>
             </div>
             {PROPOSALS.map((pr) => (
               <div key={pr.label} style={{ padding: '9px 0', borderTop: '1px solid var(--color-divider)' }}>
                 <div style={{ fontSize: 13, fontWeight: 500 }}>{pr.label}</div>
                 <div style={{ fontSize: 12, color: 'var(--color-neutral-700)', marginTop: 2, textWrap: 'pretty' }}>{pr.why}</div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'ui-monospace,Menlo,monospace',
-                    color: 'var(--color-accent-700)',
-                    marginTop: 4
-                  }}
-                >
-                  {pr.api}
-                </div>
               </div>
             ))}
           </div>
@@ -430,18 +412,15 @@ export default function Dashboard() {
 
 const PROPOSALS = [
   {
-    label: 'Place별 체크인 타임스탬프',
-    why: '이탈이 발생하는 구간과 평균 소요 시간을 알 수 있습니다',
-    api: 'GET /admin/courses/{id}/checkins'
+    label: '장소별 체크인 시각',
+    why: '이탈이 발생하는 구간과 평균 소요 시간을 알 수 있습니다'
   },
   {
     label: '일자별 참가·완주 추이',
-    why: '현재는 누적값만 있어 캠페인 효과를 시점으로 끊어볼 수 없습니다',
-    api: 'GET /admin/courses/{id}/stats?group_by=day'
+    why: '현재는 누적값만 있어 캠페인 효과를 시점으로 끊어볼 수 없습니다'
   },
   {
     label: '유입 경로 / 재방문 여부',
-    why: 'QR 스캔과 앱 내 탐색을 구분하면 오프라인 홍보물 성과를 분리할 수 있습니다',
-    api: 'GET /admin/courses/{id}/stats?dimension=source'
+    why: 'QR 스캔과 앱 내 탐색을 구분하면 오프라인 홍보물 성과를 분리할 수 있습니다'
   }
 ];

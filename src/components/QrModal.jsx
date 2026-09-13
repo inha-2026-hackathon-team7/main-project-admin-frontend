@@ -40,16 +40,6 @@ export default function QrModal() {
         }}
       >
         <Corners />
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--color-accent-700)'
-          }}
-        >
-          GET /admin/places/{p.id}/qrcode
-        </div>
         <div className="dialog-title" style={{ margin: 0 }}>
           {p.name}
         </div>
@@ -83,7 +73,7 @@ export default function QrModal() {
             color: 'var(--color-neutral-600)'
           }}
         >
-          qrcode_string
+          QR 코드 값
         </div>
         <div
           style={{
@@ -96,7 +86,7 @@ export default function QrModal() {
           {p.qrcode_string}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: 'var(--color-neutral-700)' }}>
-          ZXing 으로 즉시 인코딩된 image/png 응답입니다. 현장 부착용 인쇄 시 원본 해상도로 내려받으세요.
+          현장에 붙여둘 QR 코드예요. 인쇄해서 붙이려면 원본 해상도 그대로 내려받으세요.
         </p>
 
         <div className="dialog-actions" style={{ justifyContent: 'center', width: '100%' }}>
@@ -112,7 +102,7 @@ export default function QrModal() {
               a.href = qr.url;
               a.download = `${p.name}-qrcode.png`;
               a.click();
-              toast('info', 'QR PNG 를 내려받았습니다', `GET /admin/places/${p.id}/qrcode → image/png`);
+              toast('info', 'QR 코드 이미지를 내려받았습니다', `${p.name}의 QR 코드`);
             }}
           >
             PNG 내려받기

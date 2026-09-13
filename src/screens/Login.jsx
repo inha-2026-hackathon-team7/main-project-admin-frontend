@@ -49,17 +49,17 @@ export default function Login() {
             textWrap: 'pretty'
           }}
         >
-          지역 · Place · 코스 · 리워드를 한 곳에서 운영합니다
+          지역 · 장소 · 코스 · 리워드를 한 곳에서 운영합니다
         </div>
         <p style={{ margin: 0, fontSize: 14, opacity: 0.82, maxWidth: 380, textWrap: 'pretty' }}>
-          조직 단위로 지역과 Place 를 등록하고, QR 체크인으로 완주를 판정하고, 리워드 재고까지 같은 콘솔에서
+          조직 단위로 지역과 장소를 등록하고, QR 체크인으로 완주를 판정하고, 리워드 재고까지 같은 콘솔에서
           관리합니다.
         </p>
         <div style={{ display: 'flex', gap: 26, marginTop: 12, flexWrap: 'wrap' }}>
           {[
-            [state.places.length, 'PLACES'],
-            [state.courses.length, 'COURSES'],
-            [state.rewards.length, 'REWARDS']
+            [state.places.length, '장소'],
+            [state.courses.length, '코스'],
+            [state.rewards.length, '리워드']
           ].map(([n, label]) => (
             <div key={label}>
               <div style={{ fontFamily: 'var(--font-heading)', fontSize: 26 }}>{n}</div>
@@ -78,28 +78,18 @@ export default function Login() {
         >
           <Corners />
           <div>
-            <div
-              style={{
-                fontSize: 10,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--color-accent-700)'
-              }}
-            >
-              POST /auth/login
-            </div>
-            <h3 style={{ margin: '2px 0 0' }}>관리자 로그인</h3>
+            <h3 style={{ margin: 0 }}>관리자 로그인</h3>
             <p style={{ margin: '5px 0 0', fontSize: 13, color: 'var(--color-neutral-700)' }}>
-              role=organization 계정만 어드민 라우트로 진입합니다.
+              조직 관리자 계정으로만 로그인할 수 있어요.
             </p>
           </div>
 
           <div className="field">
-            <label>email</label>
+            <label>이메일</label>
             <input className="input" value={lf.email} onChange={set('email')} placeholder="admin@organization.kr" />
           </div>
           <div className="field">
-            <label>password</label>
+            <label>비밀번호</label>
             <input
               className="input"
               type="password"

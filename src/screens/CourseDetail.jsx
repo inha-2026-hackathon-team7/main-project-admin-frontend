@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAdmin } from '../state/AdminContext.jsx';
 import Corners from '../components/Corners.jsx';
 import { Svg, paths } from '../components/Icon.jsx';
-import { num, coordsOf } from '../lib/format.js';
+import { num, coordsOf, statusLabel } from '../lib/format.js';
 
 export default function CourseDetail() {
   const {
@@ -69,17 +69,6 @@ export default function CourseDetail() {
 
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'var(--color-accent-700)',
-              marginBottom: 4
-            }}
-          >
-            GET /admin/courses/{cur.id}
-          </div>
           <h2 style={{ margin: 0 }}>{cur.name}</h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-neutral-700)' }}>
             {cur.description || '설명이 없습니다'}
@@ -88,7 +77,7 @@ export default function CourseDetail() {
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', flex: 'none' }}>
           <div className="field">
-            <label>status</label>
+            <label>코스 상태</label>
             <select
               className="input"
               value={cur.status}
@@ -97,14 +86,14 @@ export default function CourseDetail() {
                 updateCourse(
                   cur.id,
                   { status: e.target.value },
-                  'status 를 변경했습니다',
-                  `PUT /admin/courses/${cur.id} {status:"${e.target.value}"}`
+                  '코스 상태를 변경했습니다',
+                  statusLabel(e.target.value)
                 )
               }
             >
-              <option value="draft">draft</option>
-              <option value="published">published</option>
-              <option value="archived">archived</option>
+              <option value="draft">준비중</option>
+              <option value="published">게시됨</option>
+              <option value="archived">보관됨</option>
             </select>
           </div>
 
@@ -116,11 +105,12 @@ export default function CourseDetail() {
               style={{ minWidth: 190 }}
               onChange={(e) => {
                 const v = e.target.value;
+                const selected = state.rewards.find((r) => String(r.id) === v);
                 updateCourse(
                   cur.id,
                   { reward_id: v ? parseInt(v, 10) : null },
                   '리워드 연결을 변경했습니다',
-                  `PUT /admin/courses/${cur.id} {reward_id:${v || 'null'}}`
+                  selected ? selected.name : '연결 없음'
                 );
               }}
             >
@@ -136,7 +126,7 @@ export default function CourseDetail() {
           <button
             className="btn btn-secondary"
             onClick={() => deleteCourse(cur)}
-            title={blocked ? `참가자 ${num(cur.participants)}명 — status 를 archived 로 전환하세요` : '삭제 가능'}
+            title={blocked ? `참가자 ${num(cur.participants)}명 — 삭제 대신 보관 처리해 주세요` : '삭제 가능'}
             style={
               blocked
                 ? { opacity: 0.55, color: 'var(--color-neutral-600)', borderStyle: 'dashed' }
@@ -168,18 +158,18 @@ export default function CourseDetail() {
               updateCourse(
                 cur.id,
                 { is_ordered: e.target.checked },
-                'is_ordered 를 변경했습니다',
-                `PUT /admin/courses/${cur.id} {is_ordered:${e.target.checked}}`
+                '방문 순서 설정을 변경했습니다',
+                e.target.checked ? '순서대로 방문' : '자유롭게 방문'
               )
             }
           />
           <span className="dot" />
-          <span>is_ordered — 방문 순서를 강제</span>
+          <span>정해진 순서대로 방문해야 완주 처리</span>
         </label>
         <span style={{ fontSize: 12, color: 'var(--color-neutral-700)', flex: 1, minWidth: 200 }}>
           {cur.is_ordered
-            ? 'visit_order 대로 QR 을 찍어야 완주로 인정됩니다.'
-            : '순서 없이 모든 Place 를 찍으면 완주로 인정됩니다.'}
+            ? '정해진 순서대로 QR 을 찍어야 완주로 인정됩니다.'
+            : '순서와 관계없이 모든 장소를 찍으면 완주로 인정됩니다.'}
         </span>
         {state.dirty && (
           <span className="tag tag-outline" style={{ flex: 'none' }}>
@@ -196,11 +186,11 @@ export default function CourseDetail() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(380px,1fr))', gap: 20, alignItems: 'start' }}>
-        {/* Place 풀 */}
+        {/* 장소 목록 */}
         <div className="card blueprint" style={{ padding: 14, gap: 10 }}>
           <Corners />
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-            <h4 style={{ margin: 0 }}>Place 풀</h4>
+            <h4 style={{ margin: 0 }}>추가할 장소</h4>
             <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>{poolList.length}개 선택 가능</span>
           </div>
           <input
@@ -245,23 +235,23 @@ export default function CourseDetail() {
                   border: '1px dashed var(--color-divider)'
                 }}
               >
-                추가할 수 있는 Place 가 없습니다
+                추가할 수 있는 장소가 없습니다
               </div>
             )}
           </div>
         </div>
 
-        {/* visit_order */}
+        {/* 방문 순서 */}
         <div className="card blueprint" style={{ padding: 14, gap: 10 }}>
           <Corners />
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-            <h4 style={{ margin: 0 }}>코스 구성 · visit_order</h4>
+            <h4 style={{ margin: 0 }}>코스 구성 (방문 순서)</h4>
             <span style={{ fontSize: 11, color: 'var(--color-neutral-600)' }}>드래그 또는 ↑↓ 로 정렬</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 120 }}>
             {draft.map((pid, i) => {
-              const p = place(pid) || { name: '삭제된 Place', category: '—', latitude: 0, longitude: 0, region_id: 0 };
+              const p = place(pid) || { name: '삭제된 장소', category: '—', latitude: 0, longitude: 0, region_id: 0 };
               return (
                 <div
                   key={`${pid}-${i}`}
@@ -344,7 +334,7 @@ export default function CourseDetail() {
                   border: '1px dashed var(--color-divider)'
                 }}
               >
-                왼쪽 풀에서 Place 를 추가하세요
+                왼쪽 목록에서 장소를 추가하세요
               </div>
             )}
           </div>
@@ -354,12 +344,10 @@ export default function CourseDetail() {
               borderTop: '1px solid var(--color-divider)',
               paddingTop: 10,
               fontSize: 12,
-              color: 'var(--color-neutral-700)',
-              fontFamily: 'ui-monospace,Menlo,monospace',
-              wordBreak: 'break-all'
+              color: 'var(--color-neutral-700)'
             }}
           >
-            PUT body → [{draft.map((pid, i) => `{place_id:${pid},visit_order:${i + 1}}`).join(', ')}]
+            현재 총 {draft.length}개 장소를 위 순서대로 방문합니다.
           </div>
         </div>
       </div>
